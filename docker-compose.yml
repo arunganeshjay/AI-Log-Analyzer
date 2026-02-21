@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  # ── Desktop Analyzer ─────────────────────────────────────────────
+  analyzer:
+    build: ./desktop-analyzer
+    container_name: log-analyzer
+    ports:
+      - "8080:8080"
+    volumes:
+      - analyzer-data:/data
+    environment:
+      - PORT=8080
+      - DB_PATH=/data/analyzer.db
+      - LOG_LEVEL=INFO
+      - METRICS_WINDOW_SEC=300
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Log Simulator (for testing without a real CPE) ───────────────
+  log-simulator:
+    build: ./log-simulator
+    container_name: log-simulator
+    depends_on:
+      analyzer:
+        condition: service_healthy
+    environment:
+      - ANALYZER_URL=http://analyzer:8080/api/v1/logs
+      - RATE=2
+      - SCENARIO=normal
+    profiles:
+      - testing
+
+volumes:
+  analyzer-data:
